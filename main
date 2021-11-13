@@ -1,0 +1,116 @@
+F <- function(X,landa){
+#  cat("x : ",X,"\n")
+#  cat("landa : ",landa,"\n")
+yhat= c(1,X) %*% matrix(landa,ncol=1)
+#cat("yhat",yhat,"\n")
+return (1/(1+exp(-1* as.numeric(yhat))))
+}
+
+log_likelihood <- function(landa,x_train,y_train){
+	first_log <-0
+	second_log <-0
+	for (n in seq(1, length(y_train))){
+		if(y_train[n]==1){
+			first_log<-first_log+log(F(x_train[n,],landa))
+		}
+		else{
+			second_log<-second_log+log(1-F(x_train[n,],landa))
+		}
+	}
+	return ((-1*first_log)+(-1*second_log))
+}
+
+derivation <- function(landa,x_train,y_train,i){
+	sum<-0
+	ones=rep(1, times = length(y_train))
+	x_train_tilda =matrix(c(ones,x_train),ncol=length(landa))
+	for (n in seq(1, length(y_train))){
+	  
+	  nominator =(y_train[n]-(1-y_train[n]))*F(x_train[n,],landa)*(1-F(x_train[n,],landa))*x_train_tilda[n,i]
+	  denominator = y_train[n]*F(x_train[n,],landa)+(1-y_train[n])*(1-F(x_train[n,],landa))
+	  
+	  sum<-sum+ nominator/denominator
+	}
+	
+  return (-1*sum)
+  
+}
+gradient <- function(landa,x_train,y_train){
+	gradTemp <- numeric(length(landa))
+	for (i in seq(1, length(landa))){
+	  gradTemp[i]<- derivation(landa,x_train,y_train,i)
+	}
+	return(gradTemp)
+}
+
+fit <- function(landa,data_X,data_Y,T,eta){
+  for(i in seq(1,T)){
+    grad<-gradient(landa,data_X,data_Y)
+    landa<-landa-eta*grad
+    #cat("grad",grad,"\n")
+    #cat("landa",landa,"\n")
+  }
+  return (landa)
+}
+
+predict <- function(X,landa){
+  ones=rep(1, times = dim(X)[1])
+  X=cbind(ones,X)
+  Yhat=X %*%landa
+  return (ifelse(Yhat>=0.5,1,0))
+}
+
+error_rate <- function(predictions,true_values){
+  return(mean((true_values-predictions)^2))
+}
+
+
+Auto <- read.table("Auto.data",header=T,na.strings="?")
+Auto<-na.omit(Auto)
+
+if(exists("hasRun") == FALSE){
+  attach(Auto)
+  hasRun <- TRUE 
+}
+
+High <- ifelse(mpg>=23,1,0)
+Auto <- data.frame(Auto,High)
+origin2 <- numeric(length(origin))
+origin3 <- numeric(length(origin))
+for (i in seq(1,length(origin))){
+  if (origin[i]==1){
+    origin2[i]=0
+    origin3[i]=0
+  }
+  else if (origin[i]==2){
+    origin2[i]=1
+    origin3[i]=0
+  }
+  else{
+    origin2[i]=0
+    origin3[i]=1
+  }
+}
+standardized.X= scale(matrix(data=c(horsepower,weight,year,origin2,origin3),ncol=5))
+data_X= standardized.X
+data_Y=as.numeric(High)
+d=dim(standardized.X)[2]
+
+set.seed(103)
+train<-sample(1:nrow(data_X),nrow(data_X)/2)
+data_X.train<-data_X[train,]
+data_X.test<-data_X[-train,]
+data_Y.train<-data_Y[train]
+data_Y.test<-data_Y[-train]
+
+T=100
+etas=c(0.0000000001,0.000000001,0.00000001,0.0000001,0.000001,0.00001,0.0001,0.001,0.01,0.1)
+for (eta in etas){
+  landa<-runif(d+1,min=-0.7,max=0.7)
+  coef=fit(landa,data_X.train,data_Y.train,T,eta)
+  predictions_test = predict(data_X.test,coef)
+  predictions_train = predict(data_X.train,coef)
+  cat("for eta ",eta,":","\n")
+  cat(" test error rate is :",error_rate(predictions_test,data_Y.test),"\n")
+  cat(" train error rate is :",error_rate(predictions_train,data_Y.train),"\n\n")
+}
